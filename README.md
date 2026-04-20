@@ -6,7 +6,7 @@ It performs the following actions every day at **9:00 AM Eastern Time (EST)**:
 
 1. Logs in to Doormat (`doormat login -f`)
 2. Exports temporary AWS credentials (`doormat aws export`)
-3. Writes/updates the AWS credentials file (`%USERPROFILE%\.aws\credentials`)
+3. Writes/updates only the `[default]` section in the AWS credentials file (`%USERPROFILE%\.aws\credentials`)
 4. Pushes two Terraform variable sets via Doormat (`doormat aws tf-push variable-set`)
 
 ---
@@ -43,7 +43,7 @@ When executed, the script will:
 3. The scheduled task runs this helper script, which performs:
     - doormat login -f
     - doormat aws export -a <account>
-    - Parses the export output and writes it to C:\Users\<YourUser>\.aws\credentials
+    - Parses the export output and updates only the `[default]` profile in `C:\Users\<YourUser>\.aws\credentials`
 
 ## Setup & Execution
 

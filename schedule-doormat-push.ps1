@@ -58,21 +58,54 @@ try {
         throw "Could not parse AWS credentials from doormat export output."
     }
 
-    # 2) Write %USERPROFILE%\.aws\credentials
+    # 2) Update only the [default] section in %USERPROFILE%\.aws\credentials
     $awsDir   = Join-Path $env:USERPROFILE ".aws"
     $null     = New-Item -ItemType Directory -Path $awsDir -Force -ErrorAction SilentlyContinue
     $credPath = Join-Path $awsDir "credentials"
 
-    $ini = @"
+    $defaultSection = @"
 [default]
 aws_access_key_id=$AWS_ACCESS_KEY_ID
 aws_secret_access_key=$AWS_SECRET_ACCESS_KEY
 aws_session_token=$AWS_SESSION_TOKEN
 aws_session_expiration=$AWS_SESSION_EXPIRATION
-"@
+"@.Trim()
 
-    Set-Content -Path $credPath -Value $ini -Encoding ASCII
-    Log "Wrote credentials to $credPath"
+    $existingCreds = if (Test-Path $credPath) {
+        Get-Content -Path $credPath -Raw -ErrorAction SilentlyContinue
+    } else {
+        ""
+    }
+
+    if ($null -eq $existingCreds) {
+        $existingCreds = ""
+    }
+
+    $defaultSectionPattern = '(?ms)^\[default\][^\r\n]*\r?\n.*?(?=^\[[^\]]+\]|\z)'
+
+    if ([regex]::IsMatch($existingCreds, $defaultSectionPattern)) {
+        $updatedCreds = [regex]::Replace(
+            $existingCreds,
+            $defaultSectionPattern,
+            [System.Text.RegularExpressions.MatchEvaluator]{ param($match) $defaultSection + "`r`n" }
+        )
+    }
+    else {
+        $updatedCreds = $existingCreds
+
+        if ($updatedCreds.Length -gt 0 -and -not $updatedCreds.EndsWith("`n")) {
+            $updatedCreds += "`r`n"
+        }
+
+        if ($updatedCreds.Trim().Length -gt 0) {
+            $updatedCreds += "`r`n"
+        }
+
+        $updatedCreds += $defaultSection + "`r`n"
+    }
+
+    Set-Content -Path $credPath -Value $updatedCreds -Encoding ASCII
+    Log "Updated [default] credentials in $credPath"
 
     # 3) Push the two Terraform variable sets
     & doormat aws tf-push variable-set -a $Account --id $Varset1
